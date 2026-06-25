@@ -1,24 +1,32 @@
+const express = require('express');
 const axios = require('axios');
 const cheerio = require('cheerio');
 
-module.exports = async (req, res) => {
-    // Enable Global CORS Headers
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Global CORS Middleware
+app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') return res.status(200).end();
+    next();
+});
 
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-    }
+// Root Route validation message
+app.get('/', (req, res) => {
+    res.json({ 
+        success: true, 
+        message: "FlixStream Backend Engine is fully operational! Send your request to /api/stream" 
+    });
+});
 
-    const targetUrl = req.query.url; 
-    
-    // Fallback message so you can easily verify it's working in your browser!
+// Main Scraping Endpoint
+app.get('/api/stream', async (req, res) => {
+    const targetUrl = req.query.url;
     if (!targetUrl) {
-        return res.status(200).json({ 
-            success: false, 
-            message: "FlixStream Backend Engine is fully operational! Send a URL query parameter to test it out." 
-        });
+        return res.status(400).json({ success: false, error: "Missing 'url' query parameter" });
     }
 
     try {
@@ -48,14 +56,15 @@ module.exports = async (req, res) => {
         const match = iframePage.data.match(/file\s*:\s*["'](https.*?\.mp4|https.*?\.m3u8)["']/);
         
         if (match) {
-            return res.status(200).json({ 
-                success: true, 
-                streamUrl: match[1]
-            });
+            return res.status(200).json({ success: true, streamUrl: match[1] });
         }
 
         res.status(404).json({ success: false, error: "Streaming track expression pattern match failed" });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
-};
+});
+
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+module.exports = app;
